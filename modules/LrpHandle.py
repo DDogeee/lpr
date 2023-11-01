@@ -16,49 +16,58 @@ cnn = MobileNetV3(pretrained = 'models/CNN.pt')
 
 class ImageReg(Resource):
     def post(self):
-        filestr = request.files['file'].read()
-        file_bytes = np.fromstring(filestr, np.uint8)
-        image = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
+        try:
+            filestr = request.files['file'].read()
+            file_bytes = np.fromstring(filestr, np.uint8)
+            image = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
 
-#         args = args.parse_args()
-#         im_b64 = args['b64']
-#         im_bytes = base64.b64decode(im_b64)
-#         im_arr = np.frombuffer(im_bytes, dtype=np.uint8)  # im_arr is one-dim Numpy array
-#         image = cv2.imdecode(im_arr, flags=cv2.IMREAD_COLOR)
-        plates = lp_detect(image, size = 1024).pandas().xyxy[0].values.tolist()
-        r = []
-        result = image.copy()
-        for plate in plates:
-            detect_conf = plate[4]
-            plate = plate[:4]
-            if detect_conf > 0.8:
-                crop_plate = get_crop_image(plate, image)
-                chars = char_detect(crop_plate, size = 1024).pandas().xyxy[0].values.tolist()
-                chars = [char[:4] for char in chars]
-                chars = sort_chars(chars)
-                labels = []
-                for char in chars:
-                    crop_char = get_crop_image(char, crop_plate)
-                    X = np.array(cnn(image = crop_char).detach())
-                    labels.append(KNNClassifier.predict(X)[0])
-                reg_plate = ''.join(labels)
-                r.append({
-                    "box" : plate,
-                    "conf" : detect_conf,
-                    "plate" : reg_plate
-                })
-                x0, y0, x1, y1 = plate
-                result = cv2.rectangle(result, (int(x0), int(y0)), (int(x1), int(y1)), (36,255,12), 1)
-                result = cv2.putText(result, reg_plate, (int(x0), int(y0-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36,255,12), 2)
-        
-        result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
-        _, im_arr = cv2.imencode('.jpg', result)  # im_arr: image in Numpy one-dim array format.
-        im_bytes = im_arr.tobytes()
-        im_b64 = base64.b64encode(im_bytes)
+    #         args = args.parse_args()
+    #         im_b64 = args['b64']
+    #         im_bytes = base64.b64decode(im_b64)
+    #         im_arr = np.frombuffer(im_bytes, dtype=np.uint8)  # im_arr is one-dim Numpy array
+    #         image = cv2.imdecode(im_arr, flags=cv2.IMREAD_COLOR)
+            plates = lp_detect(image, size = 1024).pandas().xyxy[0].values.tolist()
+            r = []
+            result = image.copy()
+            for plate in plates:
+                detect_conf = plate[4]
+                plate = plate[:4]
+                if detect_conf > 0.8:
+                    crop_plate = get_crop_image(plate, image)
+                    chars = char_detect(crop_plate, size = 1024).pandas().xyxy[0].values.tolist()
+                    chars = [char[:4] for char in chars]
+                    chars = sort_chars(chars)
+                    labels = []
+                    for char in chars:
+                        crop_char = get_crop_image(char, crop_plate)
+                        X = np.array(cnn(image = crop_char).detach())
+                        labels.append(KNNClassifier.predict(X)[0])
+                    reg_plate = ''.join(labels)
+                    r.append({
+                        "box" : plate,
+                        "conf" : detect_conf,
+                        "plate" : reg_plate
+                    })
+                    x0, y0, x1, y1 = plate
+                    result = cv2.rectangle(result, (int(x0), int(y0)), (int(x1), int(y1)), (36,255,12), 1)
+                    result = cv2.putText(result, reg_plate, (int(x0), int(y0-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36,255,12), 2)
+            
+            result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+            _, im_arr = cv2.imencode('.jpg', result)  # im_arr: image in Numpy one-dim array format.
+            im_bytes = im_arr.tobytes()
+            im_b64 = base64.b64encode(im_bytes)
 
-        return {
-            "image" : im_b64.decode()
-        }
+            return {
+                "error": False,
+                "message": "Success",
+                "data" : im_b64.decode()
+            }
+        except Exception as e:
+            return {
+                "error": True,
+                "message": e,
+                "data" : "",
+            }
 
 
 def get_crop_image(box, image):
