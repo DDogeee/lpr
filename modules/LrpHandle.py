@@ -6,8 +6,9 @@ import base64
 import numpy as np
 import cv2
 from flask import Flask, render_template, request, redirect, url_for
-
+import os
 from modules.MobilenetV3 import MobileNetV3
+import pandas as pd
 
 KNNClassifier = pickle.load(open('models/KNNClassifier', 'rb'))
 lp_detect = torch.hub.load('yolov5', 'custom', path='models/LP_detector.pt', force_reload=True, source='local')
@@ -96,3 +97,26 @@ def sort_chars(chars):
     line1 = sorted(line1, key=lambda s: s[0])
     line2 = sorted(line2, key=lambda s: s[0])
     return [*line1, *line2]
+
+class VideoReg(Resource):
+    def post(self):
+        try:
+
+            file = request.files['file']
+            file.save("response.mp4")
+            os.system("python track.py --source response.mp4 --save-txt")
+            df = pd.read_csv("inference/output/response.txt", header=None, sep = ' ').drop([8], axis = 1)
+            df.columns = ['frame_idx', 'object_id', 'top', 'left', 'width', 'height', 'class_id', 'speed']
+            d = df.to_dict(orient="records")
+            return  {
+                "error": False,
+                "message": "Success",
+                "data" : d
+            }
+        except Exception as e:
+            return {
+                "error": True,
+                "message": e,
+                "data" : "",
+            }
+        

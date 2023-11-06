@@ -15,5 +15,5 @@ dependencies:
       - torchvision==0.16.0
       - ultralytics==8.0.202
       - werkzeug==3.0.1
-      - yolov5==7.0.13
-prefix: /home/ddogeeee/anaconda3/envs/lpr
+      - easydict==1.11
+      - pymongo==4.6.0
