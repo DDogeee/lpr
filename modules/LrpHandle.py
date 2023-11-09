@@ -13,6 +13,10 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage
 from config import firebase_config
 import uuid
+from pymongo import MongoClient
+from config import URI
+from PIL import Image
+from io import BytesIO
 
 cred = credentials.Certificate("service_account.json")
 firebase_admin.initialize_app(cred, firebase_config)
@@ -121,7 +125,42 @@ class VideoReg(Resource):
             blob.make_public()
             df = pd.read_csv("inference/output/response.txt", header=None, sep = ' ').drop([8], axis = 1)
             df.columns = ['frame_idx', 'object_id', 'top', 'left', 'width', 'height', 'class_id', 'speed']
-            d = df.to_dict(orient="records")
+            df = df[df['speed'].apply(lambda s : s>0 and s<=80)]
+            mean_speed = df.groupby("object_id").agg(mean_speed = ('speed', "mean"))
+            df = pd.merge(df, mean_speed, on = 'object_id')
+            df['diff'] = df.apply(lambda s : abs(s['speed'] - s['mean_speed']), axis = 1)
+            df = df.sort_values(by = ['object_id', 'diff']).drop_duplicates("object_id", keep="first")
+            cap = cv2.VideoCapture("inference/output/response.mp4")
+            l = []
+            for idx in df.index:
+                frame = df.loc[idx, "frame_idx"]
+                speed = df.loc[idx, "mean_speed"]
+                object_id = df.loc[idx, "object_id"]
+                x = df.loc[idx, "left"]
+                y = df.loc[idx, "top"]
+                w = df.loc[idx, "width"]
+                h = df.loc[idx, "height"]
+                cap.set(cv2.CAP_PROP_POS_FRAMES,frame)
+                ret, frame = cap.read()
+                crop_img = frame[x:x+h, y:y+w]
+                img = Image.fromarray(crop_img)
+                im_file = BytesIO()
+                img.save(im_file, format="JPEG")
+                im_bytes = im_file.getvalue()  # im_bytes: image in binary format.
+                im_b64 = base64.b64encode(im_bytes)
+
+
+                l.append({
+                    "image" : im_b64.decode(),
+                    "speed" : speed,
+                })
+            item = {
+                "vid_id" : vid_id,
+                "list" : l,
+                "count" : len(l)
+            }
+            collection = MongoClient(URI).main.log
+            collection.insert_one(item)
             return  {
                 "error": False,
                 "message": "Success",
