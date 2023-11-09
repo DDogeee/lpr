@@ -17,3 +17,5 @@ dependencies:
       - werkzeug==3.0.1
       - easydict==1.11
       - pymongo==4.6.0
+      - requests==2.31.0
+      - firebase-admin==6.2.0

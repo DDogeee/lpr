@@ -9,6 +9,13 @@ from flask import Flask, render_template, request, redirect, url_for
 import os
 from modules.MobilenetV3 import MobileNetV3
 import pandas as pd
+import firebase_admin
+from firebase_admin import credentials, firestore, storage
+from config import firebase_config
+import uuid
+
+cred = credentials.Certificate("service_account.json")
+firebase_admin.initialize_app(cred, firebase_config)
 
 KNNClassifier = pickle.load(open('models/KNNClassifier', 'rb'))
 lp_detect = torch.hub.load('yolov5', 'custom', path='models/LP_detector.pt', force_reload=True, source='local')
@@ -101,17 +108,27 @@ def sort_chars(chars):
 class VideoReg(Resource):
     def post(self):
         try:
+            vid_id = uuid.uuid4().hex
 
             file = request.files['file']
             file.save("response.mp4")
-            os.system("python track.py --source response.mp4 --save-txt")
+            os.system("python track.py --source response.mp4 --save-txt --save-vid")
+            bucket = storage.bucket()
+            blob = bucket.blob('response.mp4')
+            outfile='inference/output/response.mp4'
+            with open(outfile, 'rb') as my_file:
+                blob.upload_from_file(my_file)
+            blob.make_public()
             df = pd.read_csv("inference/output/response.txt", header=None, sep = ' ').drop([8], axis = 1)
             df.columns = ['frame_idx', 'object_id', 'top', 'left', 'width', 'height', 'class_id', 'speed']
             d = df.to_dict(orient="records")
             return  {
                 "error": False,
                 "message": "Success",
-                "data" : d
+                "data" : {
+                    "cloudPath" : blob.public_url,
+                    "video_id" : vid_id,
+                }
             }
         except Exception as e:
             return {
