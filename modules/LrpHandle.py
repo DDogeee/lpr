@@ -113,7 +113,6 @@ class VideoReg(Resource):
     def post(self):
         try:
             vid_id = uuid.uuid4().hex
-
             file = request.files['file']
             file.save("response.mp4")
             os.system("python track.py --source response.mp4 --save-txt --save-vid")
@@ -175,4 +174,32 @@ class VideoReg(Resource):
                 "message": e,
                 "data" : "",
             }
+
+class GetVidInfo(Resource):
+    def __init__(self) -> None:
+        self.collection = MongoClient(URI).main.log
+        args = reqparse.RequestParser()
+        args.add_argument("vid_id", type=str, required=True, help="video_id is missing")
+        self.args = args
+
+    def post(self):
+        try:
+            args = self.args.parse_args()
+            item = self.collection.find_one({
+                "vid_id": args['vid_id']
+            })
+            return {
+                "error": False,
+                "message": "",
+                "data" : {
+                    "list" : item['list'],
+                    "count" : item['count']
+                },
+            }
         
+        except Exception as e:
+            return {
+                "error": True,
+                "message": e,
+                "data" : "",
+            }
