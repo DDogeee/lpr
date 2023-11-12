@@ -17,7 +17,7 @@ from pymongo import MongoClient
 from config import URI
 from PIL import Image
 from io import BytesIO
-
+import shutil
 cred = credentials.Certificate("service_account.json")
 firebase_admin.initialize_app(cred, firebase_config)
 
@@ -129,7 +129,7 @@ class VideoReg(Resource):
             df = pd.merge(df, mean_speed, on = 'object_id')
             df['diff'] = df.apply(lambda s : abs(s['speed'] - s['mean_speed']), axis = 1)
             df = df.sort_values(by = ['object_id', 'diff']).drop_duplicates("object_id", keep="first")
-            cap = cv2.VideoCapture("inference/output/response.mp4")
+
             l = []
             for idx in df.index:
                 frame = df.loc[idx, "frame_idx"]
@@ -139,8 +139,7 @@ class VideoReg(Resource):
                 y = df.loc[idx, "top"]
                 w = df.loc[idx, "width"]
                 h = df.loc[idx, "height"]
-                cap.set(cv2.CAP_PROP_POS_FRAMES,frame)
-                ret, frame = cap.read()
+                frame = cv2.imread(os.path.join("raw", str(frame)+".jpg"))
                 crop_img = frame[x:x+h, y:y+w]
                 img = Image.fromarray(crop_img)
                 im_file = BytesIO()
@@ -160,6 +159,7 @@ class VideoReg(Resource):
             }
             collection = MongoClient(URI).main.log
             collection.insert_one(item)
+            shutil.rmtree("raw")
             return  {
                 "error": False,
                 "message": "Success",

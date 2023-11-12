@@ -22,6 +22,8 @@ from yolov5.utils.general import check_img_size, non_max_suppression, scale_coor
 from yolov5.utils.torch_utils import select_device, time_sync
 from deep_sort_pytorch.utils.parser import get_config
 from deep_sort_pytorch.deep_sort import DeepSort
+
+from PIL import Image
 global np_store,exclamation
 np_store = np.zeros((500, 6))
 alpha = 1.8/1.3
@@ -211,6 +213,8 @@ def detect(opt):
     txt_file_name = source.split('/')[-1].split('.')[0]
     txt_path = str(Path(out)) + '/' + txt_file_name + '.txt'
     for frame_idx, (path, img, im0s, vid_cap) in enumerate(dataset):
+        os.makedirs("raw", exist_ok= True)
+        Image.fromarray(im0s).save(os.path.join("raw", str(frame_idx)+'.jpg'))
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
