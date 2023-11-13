@@ -18,6 +18,7 @@ from config import URI
 from PIL import Image
 from io import BytesIO
 import shutil
+
 cred = credentials.Certificate("service_account.json")
 firebase_admin.initialize_app(cred, firebase_config)
 
@@ -141,17 +142,48 @@ class VideoReg(Resource):
                 h = df.loc[idx, "height"]
                 frame = cv2.imread(os.path.join("raw", str(frame)+".jpg"))
                 crop_img = frame[x:x+h, y:y+w]
+
+                plates = lp_detect(crop_img, size = 1024).pandas().xyxy[0].values.tolist()
+                if len(plates)!=0: 
+                    plate = plates[0]
+                    detect_conf = plate[4]
+                    plate = plate[:4]
+                    if detect_conf > 0.6:
+                        crop_plate = get_crop_image(plate, crop_img)
+                        chars = char_detect(crop_plate, size = 1024).pandas().xyxy[0].values.tolist()
+                        chars = [char[:4] for char in chars]
+                        chars = sort_chars(chars)
+                        labels = []
+                        for char in chars:
+                            crop_char = get_crop_image(char, crop_plate)
+                            X = np.array(cnn(image = crop_char).detach())
+                            labels.append(KNNClassifier.predict(X)[0])
+                        reg_plate = ''.join(labels)
+                    else:
+                        reg_plate = ''
+                else:
+                    reg_plate = '' 
                 img = Image.fromarray(crop_img)
                 im_file = BytesIO()
                 img.save(im_file, format="JPEG")
                 im_bytes = im_file.getvalue()  # im_bytes: image in binary format.
                 im_b64 = base64.b64encode(im_bytes)
 
+                if int(speed)>60:
+                    l.append({
+                        "image" : im_b64.decode(),
+                        "speed" : speed,
+                        "plate" : reg_plate,
+                        "speeding" : True,
+                    })
+                else:
+                    l.append({
+                        "image" : im_b64.decode(),
+                        "speed" : speed,
+                        "plate" : reg_plate,
+                        "speeding" : False,
+                    })
 
-                l.append({
-                    "image" : im_b64.decode(),
-                    "speed" : speed,
-                })
             item = {
                 "vid_id" : vid_id,
                 "list" : l,
