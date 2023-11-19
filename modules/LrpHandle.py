@@ -18,6 +18,7 @@ from config import URI
 from PIL import Image
 from io import BytesIO
 import shutil
+from datetime import datetime
 
 cred = credentials.Certificate("service_account.json")
 firebase_admin.initialize_app(cred, firebase_config)
@@ -30,10 +31,11 @@ cnn = MobileNetV3(pretrained = 'models/CNN.pt')
 class ImageReg(Resource):
     def post(self):
         try:
+            img_id = uuid.uuid4().hex
             filestr = request.files['file'].read()
             file_bytes = np.fromstring(filestr, np.uint8)
             image = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
-
+            data = pd.read_csv("data.csv")
     #         args = args.parse_args()
     #         im_b64 = args['b64']
     #         im_bytes = base64.b64decode(im_b64)
@@ -56,10 +58,19 @@ class ImageReg(Resource):
                         X = np.array(cnn(image = crop_char).detach())
                         labels.append(KNNClassifier.predict(X)[0])
                     reg_plate = ''.join(labels)
+                    query = data.query(f"plate_number == '{reg_plate}'")
+                    if len(query) > 0 :
+                        name = query.iloc[0]['name']
+                        province = query.iloc[0]['province']
+                    else:
+                        name = "Unknow"
+                        province = "Unknow"
                     r.append({
                         "box" : plate,
                         "conf" : detect_conf,
-                        "plate" : reg_plate
+                        "plate" : reg_plate,
+                        "province" : province,
+                        "name" : name
                     })
                     x0, y0, x1, y1 = plate
                     result = cv2.rectangle(result, (int(x0), int(y0)), (int(x1), int(y1)), (36,255,12), 1)
@@ -69,11 +80,20 @@ class ImageReg(Resource):
             _, im_arr = cv2.imencode('.jpg', result)  # im_arr: image in Numpy one-dim array format.
             im_bytes = im_arr.tobytes()
             im_b64 = base64.b64encode(im_bytes)
+            collection = MongoClient(URI).main.log
+            item = {
+                "img_id" : img_id,
+                "data" : r,
+                "img" : im_b64.decode()
+            } 
+            collection.insert_one(item)
 
             return {
                 "error": False,
                 "message": "Success",
-                "data" : im_b64.decode()
+                "img_id" : img_id,
+                "data" : im_b64.decode(),
+                "log" : r,
             }
         except Exception as e:
             return {
@@ -187,7 +207,8 @@ class VideoReg(Resource):
             item = {
                 "vid_id" : vid_id,
                 "list" : l,
-                "count" : len(l)
+                "count" : len(l),
+                "date" : datetime.strftime(datetime.now(), "%Y-%m-%d")
             }
             collection = MongoClient(URI).main.log
             collection.insert_one(item)
