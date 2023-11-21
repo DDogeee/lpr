@@ -80,7 +80,7 @@ class ImageReg(Resource):
             _, im_arr = cv2.imencode('.jpg', result)  # im_arr: image in Numpy one-dim array format.
             im_bytes = im_arr.tobytes()
             im_b64 = base64.b64encode(im_bytes)
-            collection = MongoClient(URI).main.log
+            collection = MongoClient(URI).main.log_image
             item = {
                 "img_id" : img_id,
                 "data" : r,
@@ -210,7 +210,7 @@ class VideoReg(Resource):
                 "count" : len(l),
                 "date" : datetime.strftime(datetime.now(), "%Y-%m-%d")
             }
-            collection = MongoClient(URI).main.log
+            collection = MongoClient(URI).main.log_video
             collection.insert_one(item)
             shutil.rmtree("raw")
             return  {
@@ -230,7 +230,7 @@ class VideoReg(Resource):
 
 class GetVidInfo(Resource):
     def __init__(self) -> None:
-        self.collection = MongoClient(URI).main.log
+        self.collection = MongoClient(URI).main.log_video
         args = reqparse.RequestParser()
         args.add_argument("vid_id", type=str, required=True, help="video_id is missing")
         self.args = args
