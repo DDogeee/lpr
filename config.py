@@ -10,3 +10,5 @@ firebase_config = {
   "storageBucket": "lpr-data-9983a.appspot.com",
   "serviceAccout": "service_account.json"
 }
+
+PRIVATE_KEY = "NguyenNhatMinh"

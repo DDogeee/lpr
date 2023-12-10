@@ -2,7 +2,7 @@ name: lpr
 channels:
   - defaults
 dependencies:
-  - python=3.10.13=h955ad1f_0
+  - python=3.10.13
   - pip:
       - flask==3.0.0
       - flask-restful==0.3.10

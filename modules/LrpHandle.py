@@ -14,12 +14,12 @@ from firebase_admin import credentials, firestore, storage
 from config import firebase_config
 import uuid
 from pymongo import MongoClient
-from config import URI
+from config import URI, PRIVATE_KEY
 from PIL import Image
 from io import BytesIO
 import shutil
 from datetime import datetime
-
+import jwt
 cred = credentials.Certificate("service_account.json")
 firebase_admin.initialize_app(cred, firebase_config)
 
@@ -29,8 +29,24 @@ char_detect = torch.hub.load('yolov5', 'custom', path='models/char_detector.pt',
 cnn = MobileNetV3(pretrained = 'models/CNN.pt')
 
 class ImageReg(Resource):
+    def __init__(self) -> None:
+        self.collection = MongoClient(URI).main.log_video
+        args = reqparse.RequestParser()
+        # args.add_argument("token", type=str, required=True, help="token is missing")
+        args.add_argument("vid_id", type=str, required=True, help="video_id is missing")
+        self.args = args
+        
     def post(self):
         try:
+            args = self.args.parse_args()
+            token = args['token']
+            user = jwt.decode(token, PRIVATE_KEY, algorithms=["HS256"])
+            if user['role']=='user':
+                return {
+                    "error": True,
+                    "message": "Not enough permission",
+                    "data" : None,
+                }
             img_id = uuid.uuid4().hex
             filestr = request.files['file'].read()
             file_bytes = np.fromstring(filestr, np.uint8)
@@ -133,6 +149,15 @@ def sort_chars(chars):
 class VideoReg(Resource):
     def post(self):
         try:
+            token = request.form['token']
+            print(token)
+            user = jwt.decode(token, PRIVATE_KEY, algorithms=["HS256"])
+            if user['role']=='user':
+                return {
+                    "error": True,
+                    "message": "Not enough permission",
+                    "data" : None,
+                }
             vid_id = uuid.uuid4().hex
             file = request.files['file']
             file.save("response.mp4")
@@ -195,7 +220,10 @@ class VideoReg(Resource):
                         "speed" : speed,
                         "plate" : reg_plate,
                         "speeding" : True,
+                        "date" : datetime.strftime(datetime.now(), "%Y-%m-%d")
                     })
+                    collection = MongoClient(URI).main.vi_pham
+                    collection.insert_one(l[-1])
                 else:
                     l.append({
                         "image" : im_b64.decode(),
@@ -210,6 +238,7 @@ class VideoReg(Resource):
                 "count" : len(l),
                 "date" : datetime.strftime(datetime.now(), "%Y-%m-%d")
             }
+            print(item)
             collection = MongoClient(URI).main.log_video
             collection.insert_one(item)
             shutil.rmtree("raw")
@@ -232,6 +261,7 @@ class GetVidInfo(Resource):
     def __init__(self) -> None:
         self.collection = MongoClient(URI).main.log_video
         args = reqparse.RequestParser()
+        # args.add_argument("token", type=str, required=True, help="token is missing")
         args.add_argument("vid_id", type=str, required=True, help="video_id is missing")
         self.args = args
 
