@@ -83,7 +83,11 @@ class UserHandler(Resource):
             return {
                 "error": False,
                 "message": "Login succesful",
-                "data": token
+                "data": {
+                    "token" : token,
+                    "username" : username,
+                    "role" : user_['role']
+                }
             }
         else:
             return {
