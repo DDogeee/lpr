@@ -38,8 +38,7 @@ class ImageReg(Resource):
         
     def post(self):
         try:
-            args = self.args.parse_args()
-            token = args['token']
+            token = request.form['token']
             user = jwt.decode(token, PRIVATE_KEY, algorithms=["HS256"])
             if user['role']=='user':
                 return {
@@ -150,7 +149,6 @@ class VideoReg(Resource):
     def post(self):
         try:
             token = request.form['token']
-            print(token)
             user = jwt.decode(token, PRIVATE_KEY, algorithms=["HS256"])
             if user['role']=='user':
                 return {
