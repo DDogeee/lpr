@@ -41,7 +41,7 @@ class ViPhamHandler(Resource):
                 "data": None
             }
         
-    def thong_ke_vi_pham(self, date: str, token: str):
+    def thong_ke_vi_pham(self, date: str, token: str, page):
         collection = MongoClient(URI).main.users
         try:
             user = jwt.decode(token, PRIVATE_KEY, algorithms=["HS256"])
@@ -62,13 +62,15 @@ class ViPhamHandler(Resource):
                     "message": "Not enough permission",
                     "data": None
                 }
+        len_ = self.collection.count_documents({ "date" : date })
         date_ = self.collection.find({
             "date": date
-        }, {"_id" : 0})
+        }, {"_id" : 0}).skip((page-1)*10).limit(10)
         date_ = [d for d in date_]
         if date_ is not None:
             return {
-                "data": date_[:20]
+                "len" : len_,
+                "data": date_
             }
         else:
             return {
@@ -80,11 +82,12 @@ class ThongKe(ViPhamHandler):
         args = reqparse.RequestParser()
         args.add_argument("date", type=str, required=True, help="date is missing")
         args.add_argument("token", type=str, required=True, help="token is missing")
+        args.add_argument("page", type = int)
         self.args = args
     def post(self):
         args = self.args
         args = args.parse_args()
-        return self.thong_ke_vi_pham(args['date'], args['token'])
+        return self.thong_ke_vi_pham(args['date'], args['token'], args['page'])
 
 class CheckViPham(ViPhamHandler):
     def __init__(self):

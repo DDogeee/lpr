@@ -97,7 +97,7 @@ class UserHandler(Resource):
             }
     
     
-def get_user_with_role(token: str, role: str):
+def get_user_with_role(token: str, role: str, page):
         collection = MongoClient(URI).main.users
         try:
             user = jwt.decode(token, PRIVATE_KEY, algorithms=["HS256"])
@@ -121,12 +121,15 @@ def get_user_with_role(token: str, role: str):
 
             users = collection.find({
                 "role": role,
-            }, {'_id' : 0})
+            }, {'_id' : 0}).skip((page-1)*10).limit(10)
+            len_ = collection.count_documents({ "role" : role })
+
             users = [user for user in users]
             return {
                     "error": False,
                     "message": "Get users succesful",
-                    "data": users
+                    "len" : len_,
+                    "data": users,
                 }
         else:
             return {
@@ -159,8 +162,9 @@ class GetUsers(Resource):
         args = reqparse.RequestParser()
         args.add_argument("role", type=str, required=True, help="role is missing")
         args.add_argument("token", type=str, required=True, help="token is missing")
+        args.add_argument("page", type=int, required=True, help="token is missing")
         self.args = args
     def post(self):
         args = self.args
         args = args.parse_args()
-        return get_user_with_role(args['token'], args['role'])
+        return get_user_with_role(args['token'], args['role'], args['page'])
